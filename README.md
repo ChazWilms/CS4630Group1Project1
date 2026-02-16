@@ -26,5 +26,4 @@ Per the project requirements, all methods utilize classical data science, tradit
 4. Run the data integration script by executing: 
 
 ## How to Comprehend the Outputs
-* **Cleaned Data:** The processed and integrated data files are exported to the `data/processed/` directory.
-* **Visualizations:** Maps, heatmaps of complaint hotspots, and cluster plots are generated and saved in the `[Insert folder name]` directory to illustrate the relationship between business density and complaint frequency.
+---
