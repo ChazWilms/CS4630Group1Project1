@@ -1,0 +1,87 @@
+# Data files
+data/
+*.csv
+*.json
+*.tar
+*.zip
+*.gz
+*.parquet
+
+# macOS files
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual environments
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+.venv/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+*/.ipynb_checkpoints/*
+
+# IPython
+profile_default/
+ipython_config.py
+
+# PyCharm
+.idea/
+
+# VSCode
+.vscode/
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Log files
+*.log
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+
+# Model files (large trained models)
+*.pkl
+*.pickle
+*.h5
+*.hdf5
+*.pt
+*.pth
+*.ckpt
+
+# Temporary files
+*.tmp
+*.bak
+*.swp
+*~
