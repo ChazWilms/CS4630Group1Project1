@@ -20,7 +20,7 @@ Per the project requirements, all methods utilize classical data science, tradit
 * `Project-1_Report.pdf`: The final 10-page project report detailing problems studied, solutions proposed, and key findings.
 
 ## How to Run the Code
-1. Ensure you have Python installed, along with the required libraries: `[List your libraries here, e.g., pandas, scikit-learn, nltk]`.
+1. Ensure you have Python installed, along with the required libraries:
 2. **Data Access:** To get the exact raw data we used, please contact Chaz to receive the dataset ZIP files, as the open source data sets are continuouslly updating, the specific datasets we used are hosted in a shared team OneDrive folder. Once received, extract the CSV and JSON files directly into the `data/raw/` folder.
 3. Run the data cleaning pipeline by executing: 
 4. Run the data integration script by executing: 
