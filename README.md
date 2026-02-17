@@ -10,7 +10,7 @@ This project features a complete Python pipeline that integrates structured data
 Per the project requirements, all methods utilize classical data science, traditional machine learning, and classical NLP; no Large Language Models (LLMs) were used.
 
 ## Datasets
-1. **NYC Philadelphia 311 Service Requests:** Contains complaint types, descriptions, timestamps, and locations.
+1. **Philadelphia 311 Service Requests:** Contains complaint types, descriptions, timestamps, and locations.
 2. **Yelp Open Dataset:** Contains business metadata, categories, geolocation, and review text.
 
 ## Repository Structure
