@@ -7,8 +7,6 @@
 ## Project Overview
 This project features a complete Python pipeline that integrates structured data from NYC Philadelphia 311 Service Requests and unstructured text data from the Yelp Open Dataset. The final output is a cleaned, enriched, and integrated dataset supporting the analysis of urban service complaints in relation to local business environments. 
 
-Per the project requirements, all methods utilize classical data science, traditional machine learning, and classical NLP; no Large Language Models (LLMs) were used.
-
 ## Datasets
 1. **Philadelphia 311 Service Requests:** Contains complaint types, descriptions, timestamps, and locations.
 2. **Yelp Open Dataset:** Contains business metadata, categories, geolocation, and review text.
