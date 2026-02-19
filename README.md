@@ -24,5 +24,4 @@ This project features a complete Python pipeline that integrates structured data
 4. Run the data integration script by executing: 
 
 ## How to Comprehend the Outputs
-* **Cleaned Data:** The processed and integrated data files are exported to the `data/processed/` directory.
-* **Visualizations:** 
+---
