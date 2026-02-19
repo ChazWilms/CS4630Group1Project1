@@ -7,7 +7,6 @@
 ## Project Overview
 This project features a complete Python pipeline that integrates structured data from NYC Philadelphia 311 Service Requests and unstructured text data from the Yelp Open Dataset. The final output is a cleaned, enriched, and integrated dataset supporting the analysis of urban service complaints in relation to local business environments. 
 
-Per the project requirements, all methods utilize classical data science, traditional machine learning, and classical NLP; no Large Language Models (LLMs) were used.
 
 ## Datasets
 1. **NYC Philadelphia 311 Service Requests:** Contains complaint types, descriptions, timestamps, and locations.
@@ -20,11 +19,11 @@ Per the project requirements, all methods utilize classical data science, tradit
 * `Project-1_Report.pdf`: The final 10-page project report detailing problems studied, solutions proposed, and key findings.
 
 ## How to Run the Code
-1. Ensure you have Python installed, along with the required libraries: `[List your libraries here, e.g., pandas, scikit-learn, nltk]`.
+1. Ensure you have Python installed, along with the required libraries:
 2. **Data Access:** To get the exact raw data we used, please contact Chaz to receive the dataset ZIP files, as the open source data sets are continuouslly updating, the specific datasets we used are hosted in a shared team OneDrive folder. Once received, extract the CSV and JSON files directly into the `data/raw/` folder.
 3. Run the data cleaning pipeline by executing: 
 4. Run the data integration script by executing: 
 
 ## How to Comprehend the Outputs
 * **Cleaned Data:** The processed and integrated data files are exported to the `data/processed/` directory.
-* **Visualizations:** Maps, heatmaps of complaint hotspots, and cluster plots are generated and saved in the `[Insert folder name]` directory to illustrate the relationship between business density and complaint frequency.
+* **Visualizations:** 
