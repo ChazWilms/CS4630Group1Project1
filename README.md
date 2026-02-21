@@ -21,7 +21,11 @@ This project features a complete Python pipeline that integrates structured data
 1. Ensure you have Python installed, along with the required libraries:
 2. **Data Access:** To get the exact raw data we used, please contact Chaz to receive the dataset ZIP files, as the open source data sets are continuouslly updating, the specific datasets we used are hosted in a shared team OneDrive folder. Once received, extract the CSV and JSON files directly into the `data/raw/` folder.
 3. Run the data cleaning pipeline by executing: 
-4. Run the data integration script by executing: 
+4. Run the data integration script by executing:
+    ```bash
+    python src/integration/match_311_yelp.py
+    ```
+    The results will be saved in `data` folder under `integrated_311_yelp.csv`.
 
 ## How to Comprehend the Outputs
 ---
