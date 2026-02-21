@@ -2,33 +2,21 @@
 Phase 3 — Data Integration: Strategy C (Hybrid)
 
 Strategy C combines two complementary integration methods:
-  1. Geospatial proximity  — restrict candidates to Yelp businesses within a
-                             configurable radius of each 311 complaint location
-  2. Feature-based similarity — among the nearby candidates, rank by TF-IDF
-                                 cosine similarity between the 311 service_name
-                                 and the Yelp primary_category
+  1. Geospatial proximity    — restrict candidates to Yelp businesses within a
+                               configurable radius of each 311 complaint location
+                               using a BallTree with Haversine metric.
+  2. Semantic category similarity — among nearby candidates, rank by a
+                               domain-specific similarity score that maps each
+                               311 complaint type to relevant Yelp business
+                               categories using a hand-crafted lookup table.
 
 Design rationale
 ----------------
-- Geospatial filtering first dramatically prunes the search space from
-  231 k × 14 k = 3.3 B pairs down to a manageable candidate set.
 - BallTree (Haversine) gives O(n log m) nearest-neighbour queries instead
-  of O(n·m) brute-force.
-- TF-IDF on short label strings captures shared vocabulary between complaint
-  types (e.g. "sanitation violation") and business categories
-  (e.g. "Food & Restaurants") — no LLMs required.
-- The final hybrid score is a weighted sum, allowing tuning via GEO_WEIGHT
-  and CAT_WEIGHT.
-
-Inputs  (data/)
--------
-  public_cases_fc.csv              — cleaned Philadelphia 311 complaints
-  yelp_philly_business_clean.csv   — cleaned Yelp Philadelphia businesses
-
-Output  (data/)
--------
-  integrated_311_yelp.csv          — one row per (complaint, matched business)
-                                     with distance, similarity, and hybrid scores
+  of O(n·m) brute-force across 3.3 B candidate pairs.
+- SEMANTIC_MAP scores are graded (0.0–1.0): 1.0 = direct match (abandoned
+  vehicle -> Automotive), lower scores encode partial relevance.
+- The final hybrid score is a weighted sum, tunable via GEO_WEIGHT / CAT_WEIGHT.
 """
 
 import os
@@ -36,11 +24,9 @@ import time
 
 import numpy as np
 import pandas as pd
-from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.metrics.pairwise import cosine_similarity
 from sklearn.neighbors import BallTree
 
-# ── Configuration ─────────────────────────────────────────────────────────────
+# Configuration
 
 RADIUS_M       = 250      # geospatial search radius (metres)
 EARTH_RADIUS_M = 6_371_000
@@ -55,7 +41,7 @@ PATH_YELP  = os.path.join(DATA_DIR, "yelp_philly_business_clean.csv")
 PATH_OUT   = os.path.join(DATA_DIR, "integrated_311_yelp.csv")
 
 
-# ── Step 1: Load data ─────────────────────────────────────────────────────────
+# Step 1: Load data
 
 def load_data():
     """Load and minimally validate both cleaned datasets."""
@@ -73,60 +59,149 @@ def load_data():
     return df_311, df_yelp
 
 
-# ── Step 2: TF-IDF category similarity ───────────────────────────────────────
+# Step 2: Domain semantic similarity map
 
-def build_category_similarity(df_311, df_yelp):
+# Maps each 311 complaint type -> {Yelp primary_category: similarity score (0–1)}.
+# Scores are graded: 1.0 = direct semantic match, lower = partial relevance.
+# Any complaint type / category pair not listed receives score 0.0.
+# Justification: TF-IDF produces zero cosine similarity for all pairs because
+# complaint labels ("rubbish/recyclable material collection") and Yelp category
+# labels ("Food & Restaurants") share no vocabulary tokens. A domain map is
+# the appropriate classical alternative.
+SEMANTIC_MAP = {
+    # Vehicles
+    "abandoned vehicle":                     {"Automotive": 1.0,
+                                              "Local & Community Services": 0.2},
+    "abandoned bike":                        {"Active Life & Fitness": 0.7,
+                                              "Local & Community Services": 0.3},
+    "traffic signal emergency":              {"Automotive": 0.7,
+                                              "Local & Community Services": 0.4},
+    "traffic (other)":                       {"Automotive": 0.6,
+                                              "Local & Community Services": 0.3},
+    "traffic calming request":               {"Automotive": 0.5,
+                                              "Local & Community Services": 0.4},
+    "stop sign repair":                      {"Automotive": 0.4,
+                                              "Local & Community Services": 0.5},
+    "line striping":                         {"Automotive": 0.4,
+                                              "Local & Community Services": 0.5},
+    # Sanitation / waste
+    "rubbish/recyclable material collection":{"Food & Restaurants": 0.4,
+                                              "Home Services": 0.5,
+                                              "Local & Community Services": 0.4},
+    "illegal dumping":                       {"Home Services": 0.5,
+                                              "Local & Community Services": 0.6},
+    "sanitation violation":                  {"Food & Restaurants": 0.8,
+                                              "Health & Medical": 0.4,
+                                              "Shopping & Retail": 0.3},
+    "dumpster violation":                    {"Food & Restaurants": 0.5,
+                                              "Home Services": 0.5,
+                                              "Local & Community Services": 0.3},
+    "sanitation / dumpster violation":       {"Food & Restaurants": 0.6,
+                                              "Home Services": 0.5},
+    "dead animal in street":                 {"Local & Community Services": 0.5,
+                                              "Pets": 0.4},
+    "inlet cleaning":                        {"Local & Community Services": 0.6,
+                                              "Home Services": 0.3},
+    "plastic bag complaint":                 {"Shopping & Retail": 0.7,
+                                              "Food & Restaurants": 0.6},
+    # Infrastructure / streets
+    "street defect":                         {"Local & Community Services": 0.6,
+                                              "Home Services": 0.4},
+    "street light outage":                   {"Local & Community Services": 0.7,
+                                              "Home Services": 0.3},
+    "alley light outage":                    {"Local & Community Services": 0.7,
+                                              "Home Services": 0.3},
+    "street paving":                         {"Home Services": 0.5,
+                                              "Local & Community Services": 0.5},
+    "dangerous sidewalk":                    {"Local & Community Services": 0.6,
+                                              "Home Services": 0.4},
+    "manhole cover":                         {"Local & Community Services": 0.6,
+                                              "Home Services": 0.3},
+    "right of way unit":                     {"Local & Community Services": 0.6,
+                                              "Professional Services": 0.3},
+    "shoveling":                             {"Home Services": 0.7,
+                                              "Local & Community Services": 0.4},
+    "salting":                               {"Home Services": 0.6,
+                                              "Local & Community Services": 0.4},
+    "hydrant request":                       {"Local & Community Services": 0.6,
+                                              "Home Services": 0.3},
+    "complaint (streets)":                   {"Local & Community Services": 0.6,
+                                              "Home Services": 0.3},
+    "other (streets)":                       {"Local & Community Services": 0.5},
+    # Buildings / property
+    "maintenance complaint":                 {"Home Services": 0.8,
+                                              "Professional Services": 0.4},
+    "maintenance residential or commercial": {"Home Services": 0.9,
+                                              "Professional Services": 0.5},
+    "dangerous building complaint":          {"Home Services": 0.7,
+                                              "Professional Services": 0.4},
+    "construction complaints":               {"Home Services": 0.8,
+                                              "Professional Services": 0.5},
+    "graffiti removal":                      {"Local & Community Services": 0.5,
+                                              "Entertainment & Arts": 0.4,
+                                              "Home Services": 0.4},
+    "smoke detector":                        {"Home Services": 0.7,
+                                              "Health & Medical": 0.3},
+    # Licensing / legal / safety
+    "license complaint":                     {"Professional Services": 0.7,
+                                              "Food & Restaurants": 0.5,
+                                              "Shopping & Retail": 0.4},
+    "li escalation":                         {"Professional Services": 0.6,
+                                              "Local & Community Services": 0.3},
+    "fire safety complaint":                 {"Health & Medical": 0.5,
+                                              "Local & Community Services": 0.5},
+    "police complaint":                      {"Local & Community Services": 0.6},
+    "complaints against fire or ems":        {"Health & Medical": 0.6,
+                                              "Local & Community Services": 0.4},
+    # Health / social services
+    "homeless encampment request":           {"Health & Medical": 0.5,
+                                              "Local & Community Services": 0.7},
+    "opioid response unit":                  {"Health & Medical": 0.9,
+                                              "Local & Community Services": 0.3},
+    "digital navigator request":             {"Education": 0.5,
+                                              "Local & Community Services": 0.5},
+    "eclipse help":                          {"Local & Community Services": 0.5,
+                                              "Education": 0.4},
+    # Parks / environment
+    "street trees":                          {"Active Life & Fitness": 0.5,
+                                              "Local & Community Services": 0.5,
+                                              "Home Services": 0.3},
+    "parks and rec safety and maintenance":  {"Active Life & Fitness": 0.9,
+                                              "Entertainment & Arts": 0.4,
+                                              "Local & Community Services": 0.3},
+    # General
+    "information request":                   {"Local & Community Services": 0.5},
+    "kb escalations":                        {"Local & Community Services": 0.4},
+    "miscellaneous":                         {"Local & Community Services": 0.3},
+}
+
+
+def build_semantic_similarity(df_311, df_yelp):
     """
-    Build a lookup dict:
-        sim_lookup[service_name][primary_category] → cosine similarity (float)
+    Return a lookup dict:
+        sim_lookup[service_name][primary_category] -> similarity score (float)
 
-    TF-IDF is fit on the union of all complaint-type and category labels.
-    Bi-grams are included so that phrases like "street light" score better than
-    purely token-level matching.
+    Scores come from SEMANTIC_MAP. Any pair not in the map defaults to 0.0.
     """
-    print("Building TF-IDF category similarity…")
+    print("Building domain semantic similarity map…")
 
-    complaint_types = (
-        df_311["service_name"].fillna("unknown").str.lower().unique().tolist()
-    )
-    yelp_categories = (
-        df_yelp["primary_category"].fillna("unknown").str.lower().unique().tolist()
-    )
-
-    all_labels = complaint_types + yelp_categories
-
-    vectorizer = TfidfVectorizer(analyzer="word", ngram_range=(1, 2), sublinear_tf=True)
-    tfidf_all  = vectorizer.fit_transform(all_labels)
-
-    n_ct = len(complaint_types)
-    complaint_vecs = tfidf_all[:n_ct]
-    category_vecs  = tfidf_all[n_ct:]
-
-    sim_matrix = cosine_similarity(complaint_vecs, category_vecs)  # (n_ct × n_cat)
-
-    # Build lookup: original (not lowercased) keys for safe lookup at query time
-    original_cts   = df_311["service_name"].fillna("unknown").unique().tolist()
-    original_cats  = df_yelp["primary_category"].fillna("unknown").unique().tolist()
+    complaint_types = df_311["service_name"].fillna("unknown").unique().tolist()
+    yelp_categories = df_yelp["primary_category"].fillna("unknown").unique().tolist()
 
     sim_lookup = {}
-    for i, ct in enumerate(original_cts):
-        ct_lower = ct.lower()
-        # find index of the lower-cased version in complaint_types list
-        try:
-            row = complaint_types.index(ct_lower)
-        except ValueError:
-            row = 0
-        sim_lookup[ct] = {
-            cat: float(sim_matrix[row, j])
-            for j, cat in enumerate(original_cats)
-        }
+    for ct in complaint_types:
+        cat_scores = SEMANTIC_MAP.get(ct.lower(), SEMANTIC_MAP.get(ct, {}))
+        sim_lookup[ct] = {pc: cat_scores.get(pc, 0.0) for pc in yelp_categories}
 
+    covered = sum(1 for ct in complaint_types
+                  if ct.lower() in SEMANTIC_MAP or ct in SEMANTIC_MAP)
     print(f"  Complaint types : {len(complaint_types)}")
     print(f"  Yelp categories : {len(yelp_categories)}")
+    print(f"  Types with non-zero scores: {covered} / {len(complaint_types)}")
     return sim_lookup
 
 
-# ── Step 3: Geospatial BallTree search ───────────────────────────────────────
+# Step 3: Geospatial BallTree search
 
 def geospatial_match(df_311, df_yelp, radius_m=RADIUS_M):
     """
@@ -164,7 +239,7 @@ def geospatial_match(df_311, df_yelp, radius_m=RADIUS_M):
 
     n_matched = sum(1 for idxs in indices_arr if len(idxs) > 0)
     print(f"  Pairs found           : {len(idx_311_list):,}")
-    print(f"  Complaints with ≥1 match: {n_matched:,} / {len(df_311):,}")
+    print(f"  Complaints with >=1 match: {n_matched:,} / {len(df_311):,}")
     print(f"  Elapsed               : {time.time() - t0:.1f} s")
 
     return (
@@ -174,7 +249,7 @@ def geospatial_match(df_311, df_yelp, radius_m=RADIUS_M):
     )
 
 
-# ── Step 4: Build integrated dataset ─────────────────────────────────────────
+# Step 4: Build integrated dataset
 
 def build_integrated_dataset(df_311, df_yelp, idx_311, idx_yelp, distances, sim_lookup):
     """
@@ -184,8 +259,8 @@ def build_integrated_dataset(df_311, df_yelp, idx_311, idx_yelp, distances, sim_
     Scores
     ------
     proximity_score      = 1 − (distance_m / RADIUS_M)
-                           → 1.0 at same location, 0.0 at the radius edge
-    category_similarity  = TF-IDF cosine similarity (service_name vs primary_category)
+                           -> 1.0 at same location, 0.0 at the radius edge
+    category_similarity  = domain semantic map score (service_name vs primary_category)
     hybrid_score         = GEO_WEIGHT × proximity_score
                          + CAT_WEIGHT × category_similarity
     """
@@ -216,7 +291,7 @@ def build_integrated_dataset(df_311, df_yelp, idx_311, idx_yelp, distances, sim_
     hybrid_scores = GEO_WEIGHT * prox_scores + CAT_WEIGHT * cat_sims
 
     df_out = pd.DataFrame({
-        # ── 311 fields ──────────────────────────────────────────────────────
+        # 311 fields
         "service_request_id":  df_311m["service_request_id"].values,
         "service_name":        service_names.values,
         "subject":             df_311m["subject"].values,
@@ -226,7 +301,7 @@ def build_integrated_dataset(df_311, df_yelp, idx_311, idx_yelp, distances, sim_
         "zipcode_311":         df_311m["zipcode"].values,
         "lat_311":             df_311m["lat"].values,
         "lon_311":             df_311m["lon"].values,
-        # ── Yelp fields ─────────────────────────────────────────────────────
+        # Yelp fields
         "business_id":         df_yelpm["business_id"].values,
         "business_name":       df_yelpm["name"].values,
         "address_yelp":        df_yelpm["address"].values,
@@ -237,7 +312,7 @@ def build_integrated_dataset(df_311, df_yelp, idx_311, idx_yelp, distances, sim_
         "review_count":        df_yelpm["review_count"].values,
         "primary_category":    primary_cats.values,
         "categories_normalized": df_yelpm["categories_normalized"].values,
-        # ── Integration scores ───────────────────────────────────────────────
+        # Integration scores
         "distance_m":          np.round(distances, 2),
         "proximity_score":     np.round(prox_scores, 4),
         "category_similarity": np.round(cat_sims, 4),
@@ -262,17 +337,17 @@ def build_integrated_dataset(df_311, df_yelp, idx_311, idx_yelp, distances, sim_
     return df_out
 
 
-# ── Step 5: Save ──────────────────────────────────────────────────────────────
+# Step 5: Save
 
 def save_output(df_out, path=PATH_OUT):
     os.makedirs(os.path.dirname(path), exist_ok=True)
     df_out.to_csv(path, index=False)
     size_mb = os.path.getsize(path) / 1_048_576
-    print(f"Saved → {path}")
+    print(f"Saved -> {path}")
     print(f"  Shape: {df_out.shape}  |  Size: {size_mb:.1f} MB")
 
 
-# ── Summary stats ─────────────────────────────────────────────────────────────
+# Summary stats
 
 def print_summary(df_out):
     print("\n── Integration Summary ──────────────────────────────────────")
@@ -283,7 +358,7 @@ def print_summary(df_out):
           f"{df_out['distance_m'].max():.1f}  "
           f"(mean {df_out['distance_m'].mean():.1f})")
 
-    print("\nTop-5 complaint → category pairings (by frequency):")
+    print("\nTop-5 complaint -> category pairings (by frequency):")
     pairing_counts = (
         df_out.groupby(["service_name", "primary_category"])
         .size()
@@ -302,7 +377,7 @@ def print_summary(df_out):
     print(sample.to_string(index=False))
 
 
-# ── Main ──────────────────────────────────────────────────────────────────────
+# Main
 
 def main():
     print("=" * 62)
@@ -313,7 +388,7 @@ def main():
     t_total = time.time()
 
     df_311, df_yelp       = load_data()
-    sim_lookup            = build_category_similarity(df_311, df_yelp)
+    sim_lookup            = build_semantic_similarity(df_311, df_yelp)
     idx_311, idx_yelp, distances = geospatial_match(df_311, df_yelp)
     df_out                = build_integrated_dataset(
                                 df_311, df_yelp, idx_311, idx_yelp,
