@@ -19,6 +19,7 @@ Design rationale
 - The final hybrid score is a weighted sum, tunable via GEO_WEIGHT / CAT_WEIGHT.
 """
 
+import argparse
 import os
 import time
 
@@ -403,23 +404,70 @@ def print_summary(df_out):
 
 # Main
 
+def parse_args():
+    parser = argparse.ArgumentParser(
+        description="Phase 3 — Strategy C Hybrid Integration",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+    )
+    parser.add_argument(
+        "--radius", "-r",
+        type=float,
+        default=RADIUS_M,
+        help="Geospatial search radius in metres (e.g. 25, 50, 100, 250)",
+    )
+    parser.add_argument(
+        "--geo-weight",
+        type=float,
+        default=GEO_WEIGHT,
+        help="Weight for proximity score in hybrid score (0–1)",
+    )
+    parser.add_argument(
+        "--cat-weight",
+        type=float,
+        default=CAT_WEIGHT,
+        help="Weight for category similarity in hybrid score (0–1)",
+    )
+    return parser.parse_args()
+
+
 def main():
+    args = parse_args()
+
+    # Override module-level constants with CLI args
+    radius   = args.radius
+    geo_w    = args.geo_weight
+    cat_w    = args.cat_weight
+
+    # Derive output paths that include the radius so runs don't overwrite each other
+    suffix      = f"_{int(radius)}m"
+    path_out    = str(PATH_OUT).replace(".csv", f"{suffix}.csv")
+    path_closest = str(PATH_OUT_CLOSEST).replace(".csv", f"{suffix}.csv")
+
     print("=" * 62)
     print("Phase 3 — Strategy C: Hybrid Integration")
-    print(f"  Radius    : {RADIUS_M} m")
-    print(f"  Geo weight: {GEO_WEIGHT}  |  Category weight: {CAT_WEIGHT}")
+    print(f"  Radius    : {radius} m")
+    print(f"  Geo weight: {geo_w}  |  Category weight: {cat_w}")
+    print(f"  Full output   : {path_out}")
+    print(f"  Closest output: {path_closest}")
     print("=" * 62)
     t_total = time.time()
 
-    df_311, df_yelp       = load_data()
-    sim_lookup            = build_semantic_similarity(df_311, df_yelp)
-    idx_311, idx_yelp, distances = geospatial_match(df_311, df_yelp)
-    df_out                = build_integrated_dataset(
-                                df_311, df_yelp, idx_311, idx_yelp,
-                                distances, sim_lookup
-                            )
-    save_output(df_out)
-    save_closest(df_out)
+    df_311, df_yelp = load_data()
+    sim_lookup      = build_semantic_similarity(df_311, df_yelp)
+
+    idx_311, idx_yelp, distances = geospatial_match(df_311, df_yelp, radius_m=radius)
+
+    df_out = build_integrated_dataset(
+        df_311, df_yelp, idx_311, idx_yelp, distances, sim_lookup
+    )
+
+    # Recompute scores with CLI weights (in case they differ from defaults)
+    df_out["proximity_score"]  = (1.0 - df_out["distance_m"] / radius).clip(0.0, 1.0).round(4)
+    df_out["hybrid_score"]     = (geo_w * df_out["proximity_score"]
+                                  + cat_w * df_out["category_similarity"]).round(4)
+
+    save_output(df_out, path=path_out)
+    save_closest(df_out, path=path_closest)
     print_summary(df_out)
 
     print(f"\nTotal runtime: {time.time() - t_total:.1f} s")
