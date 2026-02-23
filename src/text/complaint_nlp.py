@@ -3,7 +3,7 @@ Phase 2 — Text Processing: 311 Complaint NLP Enrichment
 
 Produces an enriched version of the cleaned 311 dataset with three additions:
 
-1. VADER sentiment scores on status_notes text
+1. VADER sentiment scores on subject text
      sentiment_compound  : float  [-1, 1]
      sentiment_label     : str    (positive / neutral / negative)
 
@@ -123,13 +123,13 @@ def load_data():
 
 
 # ---------------------------------------------------------------------------
-# Step 2: VADER sentiment on status_notes
+# Step 2: VADER sentiment on subject
 # ---------------------------------------------------------------------------
 def add_sentiment(df):
-    print("\nRunning VADER sentiment on status_notes...")
+    print("\nRunning VADER sentiment on subject...")
     analyzer = SentimentIntensityAnalyzer()
 
-    text = df["status_notes"].fillna("").astype(str)
+    text = df["subject"].fillna("").astype(str)
 
     scores = [analyzer.polarity_scores(t) for t in text]
     df["sentiment_compound"] = [s["compound"] for s in scores]
@@ -240,7 +240,7 @@ def save_stats(df, acc, report):
         f.write("=" * 70 + "\n\n")
         f.write(f"Total complaints processed: {len(df):,}\n\n")
 
-        f.write("Sentiment (VADER on status_notes):\n")
+        f.write("Sentiment (VADER on subject):\n")
         for label, count in df["sentiment_label"].value_counts().items():
             f.write(f"  {label}: {count:,} ({count/len(df)*100:.1f}%)\n")
         f.write(f"  Avg compound score: {df['sentiment_compound'].mean():.4f}\n\n")
