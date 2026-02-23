@@ -36,9 +36,10 @@ CAT_WEIGHT     = 0.5      # weight for category similarity in hybrid score
 _HERE      = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR   = os.path.normpath(os.path.join(_HERE, "..", "..", "data"))
 
-PATH_311   = os.path.join(DATA_DIR, "public_cases_fc.csv")
-PATH_YELP  = os.path.join(DATA_DIR, "yelp_philly_business_clean.csv")
-PATH_OUT   = os.path.join(DATA_DIR, "integrated_311_yelp.csv")
+PATH_311   = os.path.join(DATA_DIR, "processed", "public_cases_fc 2.csv")
+PATH_YELP  = os.path.join(DATA_DIR, "processed", "yelp_philly_business_clean.csv")
+PATH_OUT         = os.path.join(DATA_DIR, "processed", "integrated_311_yelp.csv")
+PATH_OUT_CLOSEST = os.path.join(DATA_DIR, "processed", "integrated_311_yelp_closest.csv")
 
 
 # Step 1: Load data
@@ -347,6 +348,29 @@ def save_output(df_out, path=PATH_OUT):
     print(f"  Shape: {df_out.shape}  |  Size: {size_mb:.1f} MB")
 
 
+# Step 5b: Save closest-match subset (one row per complaint, nearest business)
+
+def save_closest(df_out, path=PATH_OUT_CLOSEST):
+    """
+    Save a reduced dataset containing only the single closest Yelp business
+    for each 311 complaint (minimum distance_m, ties broken by hybrid_score).
+    Useful for per-complaint statistics without the fan-out of all nearby matches.
+    """
+    closest = (
+        df_out.sort_values(["service_request_id", "distance_m", "hybrid_score"],
+                           ascending=[True, True, False])
+        .drop_duplicates(subset=["service_request_id"], keep="first")
+        .reset_index(drop=True)
+    )
+    closest.to_csv(path, index=False)
+    size_mb = os.path.getsize(path) / 1_048_576
+    print(f"Saved closest-match -> {path}")
+    print(f"  Shape: {closest.shape}  |  Size: {size_mb:.1f} MB")
+    print(f"  Avg distance to nearest business: {closest['distance_m'].mean():.1f} m")
+    print(f"  Median distance to nearest business: {closest['distance_m'].median():.1f} m")
+    return closest
+
+
 # Summary stats
 
 def print_summary(df_out):
@@ -395,6 +419,7 @@ def main():
                                 distances, sim_lookup
                             )
     save_output(df_out)
+    save_closest(df_out)
     print_summary(df_out)
 
     print(f"\nTotal runtime: {time.time() - t_total:.1f} s")
