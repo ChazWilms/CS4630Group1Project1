@@ -26,25 +26,24 @@ This project features a complete Python pipeline that integrates structured data
    * Yelp Review Cleaning: python src/cleaning/clean_yelp_reviews.py
    Each script generates cleaned datasets in the `data/processed/` folder.
 4. Run the data integration script by executing: python src/integration/match_311_yelp.py
-   This will perform spatial matching between complaints and businesses, enrich complaints with meta datasets, and produce the final integrated datasets, integrated_311_yelp(geospatial + semantic map).csv and integrated_311_yelp(geospatial + TF-IDF).csv, which can be found in the `data/processed/` folder.
-5. Run the data analysis scripts by executing:
+This will perform spatial matching between complaints and businesses, enrich complaints with meta datasets, and produce the final integrated datasets, integrated_311_yelp(geospatial + semantic map).csv and integrated_311_yelp(geospatial + TF-IDF).csv, which can be found in the `data/processed/` folder.
+6. Run the data analysis scripts by executing:
    * K-Mean Analysis: python src/analysis/k-mean-analysis.py
    * K-Mean Clustering: python src/analysis/k-mean-clustering.py
    * Comparison of Patterns by Business: python src/Phase4/ComparisonsofPatternsbyBusiness.py
    * Complaint Hotspots: python src/Phase4/ComplaintHotspotsByNeighborhood.py
    * Businesses vs. Complaints: python src/Phase4/business_vs_complaints_.py
-     This will generate graphs (hotmap, barcharts, cluster plots, etc.) that can be found in the `Graphs` folder in the shared OneDrive. 
+This will generate graphs (hotmap, barcharts, cluster plots, etc.) that can be found in the `Graphs` folder in the shared OneDrive. 
 
 ## How to Comprehend the Outputs
 1. Cleaned 311 Dataset: Gives standardized column names, removes duplicate records, cleans timestamps and geographic fields, and normalizes complaint types. This provides reliable, structured complaint data ready for integration. 
 2. Cleaned Yelp Datasets: Gives normalized business categories, removes incomplete or invalid records, and preprocesses review texts. This provides structured business metadata and feature-engineered text inputs.
-3. Integrated Datasets:
+3. Integrated Datasets: Each row represents a complaint enriched with nearby business information, category similarity metrics, and distance metrics.
    * Geospatial + Semantic Map: Matches complaints to nearby businesses within a defined radius and uses similarity to measures between complaint descriptions and business categories.
    * Geospatial + TF-IDF: Uses TF-IDF vectorization for complaint text and applies cosine similarity for feature-based integration.
-     Each row represents a complaint enriched with nearby business information, category similarity metrics, and distance metrics.
-4. Analysis Outputs:
+4. Analysis Outputs: These outputs support the interpretation of Urban complaint hotspots, patterns near different business categories, and structural trends in service requests.
    * Heatmap: Shows complaint density by neighborhood
    * Cluster Plots: Show grouped complaint patterns using K-Means
    * Bar Charts: Compares complaint frequency by business type
    * Correlation Plots: Shows relations between business density and complaint volume.
-     These outputs support the interpretation of Urban complaint hotspots, patterns near different business categories, and structural trends in service requests.
+     
