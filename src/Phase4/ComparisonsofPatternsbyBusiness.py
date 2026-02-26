@@ -31,7 +31,7 @@ def compare_categories(df):
 
     # takes top 5 complaints
     top_complaints = df['service_name'].value_counts().nlargest(5).index
-    filtered_df = df[df['service_name'].isin(top_complaints) & (df['business_group'] != 'Other')]
+    filtered_df = df[df['service_name'].isin(top_complaints)]
 
     # creates graph
     plt.figure(figsize=(12, 7))
