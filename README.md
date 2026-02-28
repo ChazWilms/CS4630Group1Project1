@@ -26,6 +26,7 @@ This project features a complete Python pipeline that integrates structured data
 2. **Data Access:** To get the exact raw data we used, please contact Chaz to receive the dataset ZIP files, as the open source data sets are continuouslly updating, the specific datasets we used are hosted in a shared team OneDrive folder. Once received, extract the CSV and JSON files directly into the `data/raw/` folder.
 3. Run the data cleaning pipeline by executing:
    * 311 Cleaning: `python src/cleaning/clean_311.py`
+       * This file requires command line inputs of the directory and file name, such as 'python clean_311.py -d/--dir \<file path> -f/--filename \<file name>'
    * Yelp Business Cleaning: `python src/cleaning/clean_yelp_business.py`
    * Yelp Review Cleaning: `python src/cleaning/clean_yelp_reviews.py`
    Each script generates cleaned datasets in the `data/processed/` folder.
