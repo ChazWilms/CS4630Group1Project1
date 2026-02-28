@@ -37,7 +37,7 @@ CAT_WEIGHT     = 0.5      # weight for category similarity in hybrid score
 _HERE      = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR   = os.path.normpath(os.path.join(_HERE, "..", "..", "data"))
 
-PATH_311   = os.path.join(DATA_DIR, "processed", "public_cases_fc 2.csv")
+PATH_311   = os.path.join(DATA_DIR, "processed", "public_cases_fc.csv")
 PATH_YELP  = os.path.join(DATA_DIR, "processed", "yelp_philly_business_clean.csv")
 PATH_OUT         = os.path.join(DATA_DIR, "processed", "integrated_311_yelp.csv")
 PATH_OUT_CLOSEST = os.path.join(DATA_DIR, "processed", "integrated_311_yelp_closest.csv")

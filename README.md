@@ -14,13 +14,21 @@ This project implements a complete Python data pipeline that integrates structur
 
 ## Datasets
 
-**You must obtain the raw data files before running the pipeline.** Due to file size, they are not stored in the repository. Contact a group member or request access to the shared OneDrive folder to receive the raw data ZIP files.
+**You must obtain the raw data files before running the pipeline.** The data is not stored in this repository due to file size. Download it from the shared OneDrive folder:
 
-| Dataset | Description | Place in |
-|---|---|---|
-| Philadelphia 311 Service Requests | `public_cases_fc 2.csv` — complaint types, timestamps, addresses, lat/lon | `data/raw/` |
-| Yelp Business Dataset | `yelp_academic_dataset_business.json` | `data/raw/Yelp JSON/` |
-| Yelp Review Dataset | `yelp_academic_dataset_review.json` (~5 GB) | `data/raw/Yelp JSON/` |
+**[Download Raw Data (OneDrive)](https://falconbgsu-my.sharepoint.com/:f:/g/personal/cwilms_bgsu_edu/IgDahgf74i67QbGsfH4FNaNIASx8FIoQh3wMvXKL6MUgNWw?e=VFsBsg)**
+
+Once downloaded, place the files in the repository as follows:
+
+```
+data/
+├── raw/
+│   ├── public_cases_fc.csv              ← Philadelphia 311 Service Requests
+│   └── Yelp JSON/
+│       ├── yelp_academic_dataset_business.json
+│       └── yelp_academic_dataset_review.json    (~5 GB)
+└── processed/                           ← created automatically by the scripts
+```
 
 ---
 
@@ -29,11 +37,12 @@ This project implements a complete Python data pipeline that integrates structur
 ```
 CS4630Group1Project1/
 ├── data/
-│   ├── raw/                        # Raw input files (not committed — see above)
+│   ├── raw/                        # Raw input files (not committed — download from OneDrive)
+│   │   ├── public_cases_fc.csv
 │   │   └── Yelp JSON/
 │   │       ├── yelp_academic_dataset_business.json
 │   │       └── yelp_academic_dataset_review.json
-│   └── processed/                  # All intermediate and final output CSVs
+│   └── processed/                  # All intermediate and final output CSVs (auto-generated)
 ├── src/
 │   ├── acquisition/                # Phase 1: Load and filter raw data
 │   │   ├── load_yelp_business.py
@@ -119,7 +128,7 @@ python src/acquisition/load_yelp_reviews.py
 
 **Clean the 311 dataset:**
 ```bash
-python src/cleaning/clean_311.py --dir data/raw/ --filename "public_cases_fc 2.csv"
+python src/cleaning/clean_311.py --dir data/raw/ --filename "public_cases_fc.csv"
 ```
 - `-d` / `--dir`: path to the directory containing the 311 CSV (must end with `/`)
 - `-f` / `--filename`: name of the CSV file
@@ -172,7 +181,7 @@ python src/integration/match_311_yelp.py
 python src/integration/match_311_yelp.py --radius 500 --geo-weight 0.6 --cat-weight 0.4
 ```
 
-- Input: `data/processed/public_cases_fc 2.csv` (cleaned 311 data)
+- Input: `data/processed/public_cases_fc.csv` (cleaned 311 data)
 - Input: `data/processed/yelp_philly_business_clean.csv`
 - Output: `data/processed/integrated_311_yelp_250m.csv` — all complaint-business pairs within radius
 - Output: `data/processed/integrated_311_yelp_closest_250m.csv` — one closest business per complaint
@@ -181,8 +190,6 @@ python src/integration/match_311_yelp.py --radius 500 --geo-weight 0.6 --cat-wei
 1. **Geospatial search:** BallTree with Haversine metric finds all Yelp businesses within the search radius of each 311 complaint
 2. **Semantic similarity:** A domain-specific lookup table maps each complaint type to relevant Yelp business categories (scores 0.0–1.0)
 3. **Hybrid score:** `hybrid_score = 0.5 × proximity_score + 0.5 × category_similarity`
-
-> **Note:** The integration script expects the cleaned 311 file to be at `data/processed/public_cases_fc 2.csv`. If your file has a different name, update the `PATH_311` variable at the top of `src/integration/match_311_yelp.py`.
 
 ---
 
